@@ -1,23 +1,30 @@
 # ============================================================================
-# IMPORTANT: For verified compatible versions, use requirements_compatible.txt
-# This file contains minimal version specifications for flexibility.
-# See requirements_compatible.txt for pinned, tested versions (Python 3.13.5)
+# Streamlit Cloud Deployment Requirements
+# Python Version: 3.11 (specified in runtime.txt)
+# Tested and compatible versions for production deployment
 # ============================================================================
 
-# Core LlamaIndex framework (Python 3.13 compatible)
-llama-index
-llama-index-embeddings-openai
-llama-index-llms-openai
+# Core LlamaIndex framework
+llama-index-core==0.11.0
+llama-index-embeddings-openai==0.2.5
+llama-index-llms-openai==0.2.9
+llama-index-vector-stores-chroma==0.2.0
 
-# OpenAI for embeddings and text generation
-openai
-tiktoken
+# OpenAI
+openai==1.54.3
+tiktoken==0.8.0
 
-# Vector store (if using Chroma as backend with LlamaIndex)
-chromadb
+# Vector Database
+chromadb==0.5.11
+pydantic==2.9.2
+pydantic-core==2.23.4
+
+# Streamlit
+streamlit==1.39.0
 
 # Utilities
-python-dotenv
-docx2txt
-streamlit
-numpy
+python-dotenv==1.0.1
+numpy==1.26.4
+
+# Optional (only if you use these features)
+# docx2txt==0.8  # Uncomment if you process Word documents

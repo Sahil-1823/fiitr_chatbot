@@ -53,14 +53,31 @@ load_dotenv()
 # Initialize logger
 logger = setup_logger(__name__, level="INFO", json_format=False)
 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+# Load API key - works both locally and on Streamlit Cloud
+try:
+    # Try Streamlit secrets first (for cloud deployment)
+    OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
+    if OPENAI_API_KEY:
+        logger.info("Loaded API key from Streamlit secrets")
+except (FileNotFoundError, AttributeError):
+    # Fall back to environment variables (for local development)
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+    if OPENAI_API_KEY:
+        logger.info("Loaded API key from environment variables")
+
+if not OPENAI_API_KEY:
+    logger.error("No OpenAI API key found!")
+    st.error("⚠️ OpenAI API key not configured. Please add it to Streamlit secrets or .env file.")
+    st.stop()
+
 OPENAI_CLIENT = OpenAI(api_key=OPENAI_API_KEY)
 CHROMA_DB_DIR = "chroma_llamaindex_db"
 
 logger.info("Application starting", extra={
     'extra_data': {
         'chroma_db_dir': CHROMA_DB_DIR,
-        'environment': os.getenv('ENVIRONMENT', 'development')
+        'environment': os.getenv('ENVIRONMENT', 'development'),
+        'api_key_configured': bool(OPENAI_API_KEY)
     }
 })
 
@@ -83,7 +100,7 @@ def load_index():
             # Setup OpenAI embeddings (must match ingestion)
             embed_model = OpenAIEmbedding(
                 model="text-embedding-3-large",
-                api_key=os.getenv("OPENAI_API_KEY")
+                api_key=OPENAI_API_KEY  # Use the already loaded API key
             )
             
             # Initialize Chroma client

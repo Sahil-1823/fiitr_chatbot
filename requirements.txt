@@ -1,0 +1,23 @@
+# ============================================================================
+# IMPORTANT: For verified compatible versions, use requirements_compatible.txt
+# This file contains minimal version specifications for flexibility.
+# See requirements_compatible.txt for pinned, tested versions (Python 3.13.5)
+# ============================================================================
+
+# Core LlamaIndex framework (Python 3.13 compatible)
+llama-index
+llama-index-embeddings-openai
+llama-index-llms-openai
+
+# OpenAI for embeddings and text generation
+openai
+tiktoken
+
+# Vector store (if using Chroma as backend with LlamaIndex)
+chromadb
+
+# Utilities
+python-dotenv
+docx2txt
+streamlit
+numpy

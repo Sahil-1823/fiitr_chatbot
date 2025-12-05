@@ -71,7 +71,7 @@ if not OPENAI_API_KEY:
     st.stop()
 
 OPENAI_CLIENT = OpenAI(api_key=OPENAI_API_KEY)
-CHROMA_DB_DIR = "chroma_llamaindex_db"
+CHROMA_DB_DIR = "new_chroma_llamaindex_db"
 
 logger.info("Application starting", extra={
     'extra_data': {

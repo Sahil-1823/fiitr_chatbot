@@ -159,6 +159,7 @@ def get_retriever(top_k: int = 5, mmr_threshold: float = 0.85):
     index = load_index()
     return index.as_retriever(
         similarity_top_k=top_k,
+        vector_store_query_kwargs={"where": None}
         # MMR mode disabled - causes ChromaDB where clause errors
         # vector_store_query_mode="mmr",
         # vector_store_kwargs={"mmr_threshold": mmr_threshold}
@@ -292,7 +293,9 @@ Answer (be detailed with bullet points whenever needed • when helpful, stay wa
         llm=answer_llm,
         # vector_store_query_mode="mmr",
         # vector_store_kwargs={"mmr_threshold": 0.85},
-        streaming=True  # Enable streaming for perceived speed
+        streaming=True ,
+        filters=None,   # Prevent router from generating empty filters
+        vector_store_query_kwargs={"where": None} # Enable streaming for perceived speed
     )
     
     # Create query engine tools

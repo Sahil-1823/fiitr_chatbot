@@ -15,7 +15,8 @@ openai>=1.40.0,<2.0.0
 tiktoken>=0.7.0,<1.0.0
 
 # Vector Database - flexible versions
-chromadb>=0.5.0,<0.6.0
+# chromadb>=0.5.0,<0.6.0
+chromadb==0.4.24
 pydantic>=2.0.0,<3.0.0
 
 # Streamlit - latest stable

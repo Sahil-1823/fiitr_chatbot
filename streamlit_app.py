@@ -291,11 +291,10 @@ Answer (be detailed with bullet points whenever needed • when helpful, stay wa
         similarity_top_k=3,  # Reduced from 5 for speed
         text_qa_template=qa_prompt,
         llm=answer_llm,
-        # vector_store_query_mode="mmr",
-        # vector_store_kwargs={"mmr_threshold": 0.85},
         streaming=True ,
         filters=None,   # Prevent router from generating empty filters
-        vector_store_query_kwargs={"where": None} # Enable streaming for perceived speed
+        vector_store_query_kwargs={"where": None} ,
+        vector_store_query_mode="default"# Enable streaming for perceived speed
     )
     
     # Create query engine tools
@@ -547,7 +546,8 @@ Answer (be detailed with bullet points whenever needed • when helpful, stay wa
                     text_qa_template=qa_prompt,
                     llm=answer_llm,
                     streaming=True,
-                    filters=None,  # Explicitly set to None to avoid ChromaDB where clause issues
+                    filters=None,
+                    vector_store_query_kwargs={"where": None}  # Explicitly set to None to avoid ChromaDB where clause issues
                 )
                 
                 fallback_response = knowledge_engine.query(query_with_context)

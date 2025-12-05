@@ -474,35 +474,112 @@ def generate_answer_with_router(query: str, chat_history: str = "") -> Tuple[str
         response = router.query(query_with_context)
         route_time = time.time() - route_start
     except (IndexError, AttributeError, KeyError, ValueError) as e:
-        # Router failed - likely out-of-domain query
-        logger.warning("Router query failed - out of domain", extra={
+        # Router failed - could be out-of-domain OR router malfunction
+        import traceback
+        error_traceback = traceback.format_exc()
+        
+        logger.warning("Router query failed - attempting fallback", extra={
             'extra_data': {
                 'query': query[:100],
                 'error_type': type(e).__name__,
-                'error_message': str(e)
+                'error_message': str(e),
+                'traceback_preview': error_traceback[:500]
             }
         })
         
         print(f" Router Error: {type(e).__name__}")
+        print(f" Error Message: {str(e)[:200]}")
         route_time = time.time() - route_start
         
-        # Return friendly out-of-domain message
-        out_of_domain_msg = (
-            "Hey! 👋 I'm your FITTR AI Assistant, specialized in **fitness, nutrition, and health** topics. "
-            "\n\nI don't have information about that particular topic, but I'd love to help with:\n"
-            "• 💪 Fitness & workout routines\n"
-            "• 🥗 Nutrition & diet advice\n"
-            "• 🏋️ Muscle building & weight loss\n"
-            "• 🧘 Health & wellness tips\n"
-            "• 📱 FITTR app & services\n\n"
-            "What fitness or health question can I help you with today? ✨"
-        )
+        # FALLBACK: Use pattern-based routing instead of router
+        # This handles router malfunctions while still serving fitness queries
+        if is_small_talk:
+            # Definitively small talk - use small talk engine
+            small_talk_engine = SmallTalkQueryEngine()
+            fallback_response = small_talk_engine.custom_query(preprocessed_query)
+            print(f" Fallback: small_talk engine")
+            return fallback_response, [], "unified", "small_talk"
+        else:
+            # Assume it's a knowledge query if not small talk
+            # This prevents false "out of domain" for valid fitness queries
+            try:
+                print(f" Fallback: trying knowledge engine directly...")
+                index = load_index()
+                from llama_index.core.prompts import PromptTemplate
+                
+                qa_prompt = PromptTemplate(
+                    """You're a friendly fitness & health buddy!  
+Use the context below to answer in a warm, human style.
+
+Rules:
+• Use short paragraphs (2–3 lines each)  
+• Add bullet points (•) only when helpful  
+• Be friendly, positive, and encouraging  
+• If this is a follow-up question based on previous conversation, acknowledge that context naturally
+• Do NOT write excessively long answers — keep it moderately detailed  
+• Focus only on relevant information from context
+
+Context from Documents:
+{context_str}
+
+Question:
+{query_str}
+
+
+Answer (be detailed with bullet points whenever needed • when helpful, stay warm & encouraging):"""
+                )
+                
+                answer_llm = LlamaOpenAI(
+                    model="gpt-4o-mini", 
+                    temperature=0.1,
+                    api_key=OPENAI_API_KEY
+                )
+                
+                knowledge_engine = index.as_query_engine(
+                    similarity_top_k=3,
+                    text_qa_template=qa_prompt,
+                    llm=answer_llm,
+                    streaming=True
+                )
+                
+                fallback_response = knowledge_engine.query(query_with_context)
+                fallback_nodes = fallback_response.source_nodes if hasattr(fallback_response, 'source_nodes') else []
+                
+                if hasattr(fallback_response, 'response_gen'):
+                    answer_or_gen = fallback_response.response_gen
+                else:
+                    answer_or_gen = str(fallback_response)
+                
+                print(f" Fallback: knowledge engine succeeded!")
+                return answer_or_gen, fallback_nodes, "unified", "knowledge_query"
+                
+            except Exception as fallback_error:
+                # Both router AND direct query failed - truly out of domain or system error
+                logger.error("Both router and fallback failed", extra={
+                    'extra_data': {
+                        'query': query[:100],
+                        'fallback_error': str(fallback_error)
+                    }
+                }, exc_info=True)
+                print(f" Fallback also failed: {str(fallback_error)[:100]}")
         
-        print(f"⏱️ TIMING BREAKDOWN:")
-        print(f"   Route: out_of_domain (fallback)")
-        print(f"   Total: {route_time:.2f}s")
-        
-        return out_of_domain_msg, [], "out_of_domain", "fallback"
+                # Return friendly out-of-domain message
+                out_of_domain_msg = (
+                    "Hey! 👋 I'm your FITTR AI Assistant, specialized in **fitness, nutrition, and health** topics. "
+                    "\n\nI don't have information about that particular topic, but I'd love to help with:\n"
+                    "• 💪 Fitness & workout routines\n"
+                    "• 🥗 Nutrition & diet advice\n"
+                    "• 🏋️ Muscle building & weight loss\n"
+                    "• 🧘 Health & wellness tips\n"
+                    "• 📱 FITTR app & services\n\n"
+                    "What fitness or health question can I help you with today? ✨"
+                )
+                
+                print(f"⏱️ TIMING BREAKDOWN:")
+                print(f"   Route: out_of_domain (all methods failed)")
+                print(f"   Total: {route_time:.2f}s")
+                
+                return out_of_domain_msg, [], "out_of_domain", "fallback"
     
     route_time = time.time() - route_start
     print(f" Done ({route_time:.2f}s)")

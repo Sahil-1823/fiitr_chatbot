@@ -144,22 +144,24 @@ def load_index():
 @st.cache_resource
 def get_retriever(top_k: int = 5, mmr_threshold: float = 0.85):
     """
-    Get retriever from index with MMR enabled (cached).
+    Get retriever from index with standard similarity search.
+    
+    NOTE: MMR mode removed due to ChromaDB version compatibility on Streamlit Cloud.
+    MMR creates empty where clauses that cause ValueError in ChromaDB.
     
     Args:
-        top_k: Number of candidates for MMR (default: 5, reduced for speed)
-        mmr_threshold: MMR threshold for diversity (default: 0.85, increased for relevance)
+        top_k: Number of similar documents to retrieve (default: 5)
+        mmr_threshold: Not used anymore, kept for backward compatibility
     
     Returns:
-        LlamaIndex retriever with MMR enabled
+        LlamaIndex retriever with standard similarity search
     """
     index = load_index()
     return index.as_retriever(
         similarity_top_k=top_k,
-        vector_store_query_mode="mmr",
-        vector_store_kwargs={
-            "mmr_threshold": mmr_threshold
-        }
+        # MMR mode disabled - causes ChromaDB where clause errors
+        # vector_store_query_mode="mmr",
+        # vector_store_kwargs={"mmr_threshold": mmr_threshold}
     )
 
 
@@ -535,11 +537,14 @@ Answer (be detailed with bullet points whenever needed • when helpful, stay wa
                     api_key=OPENAI_API_KEY
                 )
                 
+                # Create knowledge engine WITHOUT any vector_store_kwargs to avoid ChromaDB issues
+                # Explicitly set filters=None to prevent empty where clause errors
                 knowledge_engine = index.as_query_engine(
                     similarity_top_k=3,
                     text_qa_template=qa_prompt,
                     llm=answer_llm,
-                    streaming=True
+                    streaming=True,
+                    filters=None,  # Explicitly set to None to avoid ChromaDB where clause issues
                 )
                 
                 fallback_response = knowledge_engine.query(query_with_context)

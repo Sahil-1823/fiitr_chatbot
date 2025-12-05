@@ -218,7 +218,8 @@ def format_chat_history(messages: List[Dict], max_exchanges: int = 3) -> str:
         route = msg.get("route", "")
         
         # Skip small talk exchanges from history
-        if "small_talk" in route.lower():
+        # Safely handle route being None or missing
+        if route and "small_talk" in str(route).lower():
             continue
         
         if role == "user":

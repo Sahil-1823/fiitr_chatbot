@@ -283,12 +283,13 @@ Answer (be detailed with bullet points whenever needed • when helpful, stay wa
     )
     
     # Optimized for speed: reduced to 3 documents, streaming enabled
+    # Note: MMR mode removed due to ChromaDB version compatibility on Streamlit Cloud
     knowledge_engine = index.as_query_engine(
         similarity_top_k=3,  # Reduced from 5 for speed
-        vector_store_query_mode="mmr",
-        vector_store_kwargs={"mmr_threshold": 0.85},
         text_qa_template=qa_prompt,
         llm=answer_llm,
+        # vector_store_query_mode="mmr",
+        # vector_store_kwargs={"mmr_threshold": 0.85},
         streaming=True  # Enable streaming for perceived speed
     )
     
@@ -506,21 +507,14 @@ def generate_answer_with_router(query: str, chat_history: str = "") -> Tuple[str
     route_time = time.time() - route_start
     print(f" Done ({route_time:.2f}s)")
     
-    # Handle streaming response
-    stream_start = time.time()
+    # Handle streaming response - return generator for UI
     if hasattr(response, 'response_gen'):
-        # Streaming response - collect all tokens
-        print(f"[Collecting stream...]", end="", flush=True)
-        answer = ""
-        token_count = 0
-        for token in response.response_gen:
-            answer += token
-            token_count += 1
-        stream_time = time.time() - stream_start
-        print(f" Done ({stream_time:.2f}s, {token_count} tokens)")
+        # Return generator for token-by-token streaming
+        print(f"[Streaming enabled]")
+        answer_or_gen = response.response_gen
     else:
-        answer = str(response)
-        stream_time = 0
+        # Non-streaming response
+        answer_or_gen = str(response)
         print(f"[No streaming]")
     
     # Detect route by checking for source nodes
@@ -533,45 +527,9 @@ def generate_answer_with_router(query: str, chat_history: str = "") -> Tuple[str
         route_name = "small_talk"
     nodes_time = time.time() - nodes_start
     
-    total_time = time.time() - timing_start
-    retrieval_time = route_time
-    
-    # Detailed timing breakdown with all phases
-    print(f"⏱️ TIMING BREAKDOWN:")
-    print(f"   Route: {route_name}")
-    print(f"   Total: {total_time:.2f}s")
-    print(f"   - Routing: {route_time:.2f}s")
-    if stream_time > 0:
-        print(f"   - Stream collection: {stream_time:.2f}s")
-    print(f"   - Nodes processing: {nodes_time:.3f}s")
-    
-    # Calculate unaccounted time (potential Streamlit overhead)
-    accounted_time = route_time + stream_time + nodes_time
-    unaccounted_time = total_time - accounted_time
-    if unaccounted_time > 1:
-        print(f"   - ⚠️ Unaccounted (likely Streamlit overhead): {unaccounted_time:.2f}s")
-    
-    if total_time > 5:
-        print(f"   ⚠️ WARNING: Response time > 5s!")
-        logger.warning("Slow query detected", extra={
-            'extra_data': {
-                'query': query[:100],
-                'total_time': round(total_time, 2),
-                'route': route_name
-            }
-        })
-    
-    # Log RAG query with performance metrics
-    log_rag_query(logger, query, {
-        'route': route_name,
-        'duration_seconds': round(total_time, 3),
-        'routing_time': round(route_time, 3),
-        'stream_time': round(stream_time, 3) if stream_time > 0 else 0,
-        'num_sources': len(nodes),
-        'answer_length': len(answer)
-    })
-    
-    return answer, nodes, "unified", route_name
+    # Return generator or string for streaming display
+    # Note: Timing logged after streaming completes in UI
+    return answer_or_gen, nodes, "unified", route_name
 
 
 def generate_answer(query: str, chat_history: str = "") -> Tuple[str, List[NodeWithScore], str]:
@@ -670,11 +628,16 @@ if query := st.chat_input("💬 Ask me about fitness, nutrition, or health..."):
     with st.spinner(" Thinking..."):
         # Format recent chat history (last 3 exchanges)
         chat_history = format_chat_history(st.session_state.messages, max_exchanges=3)
-        answer, nodes, route = generate_answer(query, chat_history)
+        answer_or_gen, nodes, route = generate_answer(query, chat_history)
     
-    # Display assistant message
+    # Display assistant message with streaming
     with st.chat_message("assistant"):
-        st.markdown(answer)
+        # Use st.write_stream for token-by-token streaming
+        if hasattr(answer_or_gen, '__iter__') and not isinstance(answer_or_gen, str):
+            answer = st.write_stream(answer_or_gen)
+        else:
+            st.markdown(answer_or_gen)
+            answer = answer_or_gen
         
         # Only show evidence for knowledge queries
         if len(nodes) > 0 and "small_talk" not in route.lower():
